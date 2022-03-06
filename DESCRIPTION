@@ -1,0 +1,23 @@
+Package: typewriter
+Title: Type annotations and runtime type checks
+Version: 0.0.0.9000
+Authors@R: 
+    person(
+        "Doug", "Kelkhoff", , 
+        "doug.kelkhoff@gmail.com", 
+        role = c("aut", "cre"),
+    )
+Description:
+    Adds type annotations and runtime type checks for R in a convenient syntax.
+    Provides an interface for type generics and type bounds, using standard R
+    functions to provide a form of class traits or interfaces. Aims to work
+    nicely with the existing R ecosystem, allowing the type system to work
+    out-of-the-box without the need to declare types or define types manually.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.2
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr

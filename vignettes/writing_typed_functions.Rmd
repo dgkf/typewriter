@@ -1,0 +1,166 @@
+---
+title: "Writing Typed Functions"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{writing_typed_functions}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(typing)
+```
+
+# Introduction
+
+R is a dynamically typed language, and it would be an incredible effort to try
+to introduce truly static typing behaviors into R and robustly handle the
+incredible flexibility that non-standard evaluation offers. 
+
+Instead, typing can be used to perform type assertions at runtime. Often this
+comes in the form of defensive programming and assertions. This package simply
+aims to make those practices easier to embed and easier to integrate into a
+package development workflow. 
+
+To do this, we pass a "typed" function definition to the `type` function.
+
+```{r introduction}
+type(function(a = 1:10 :numeric) {
+  sum(a)
+})
+```
+
+As we can see, the type function does some clean-up of our function. Even though
+the original function was syntactically _valid_, it would most likely throw an
+error. The `type` function takes type definitions and embeds them as a type
+checking function call within the function body. There's still some non-standard
+stuff tucked into the `type_constrain` and `type_check` function calls, but at
+least our function header looks more familiar.
+
+# Type Checking
+
+Type checking is handled by the `type_check` function. This function looks at
+the surrounding environment and checks available values against type
+definitions.
+
+```{r error}
+with(list(a = 1L), type_check(c(), a = character))
+```
+
+> For now we're going to ignore the first argument and focus on the remaining
+> named arguments. For the following examples, we'll ignore the outer `with()`
+> call.
+
+## Type Definitions
+
+There are a few different ways that types can be defined as:
+
+1. `character`  
+   A `character` type is considered to be satisfied if the object inherits a
+   matching class, or if `mode(x)` evaluates to the `character` value (e.g. `1L`
+   will satisfy the type definition `"numeric"`).
+
+   **Examples:** 
+   ```
+   type_check(c(), a = "character")
+   ```
+
+1. `name`  
+   If a predicate function (returning a singular logical value) exists in the
+   function definition environment, then an argument is considered to satisfy
+   the type definition if the predicate returns `TRUE`. If no such predicate
+   function exists, the name is interpretted as though it is a `character` type
+   definition.
+
+   **Examples:** 
+   ```
+   type_check(c(), a = numeric)     # character
+   type_check(c(), a = is.numeric)  # predicate
+   ```
+
+1. `function`
+   Similar to the predicates provided as a `name`, predicates can be provided as
+   in in-line function.
+
+   **Examples:** 
+   ```
+   type_check(c(), a = function(i) length(i) == 3L)
+   ```
+
+1. `call`
+   Although represented like a call, this syntax is meant to be used to define
+   type traits (or rather, interfaces). You may want to accept arguments that
+   are numeric vectors of a particular length. In this way, you can provide
+   interfaces and the expected output for your type bounds. You could define a
+   custom predicate to constrain your type, or use the `call` syntax to apply an
+   in-line constraint. This behavior is easier shown:
+
+   **Examples:**
+   ```
+   type_check(c(), a = numeric(length=3L))
+   type_check(c(), a = list(names=c("x", "y")))
+   ```
+
+1. Unions
+   This mode of definition is a special syntactic case, using the `|` operator
+   as a shorthand for a type union, allowing for an argument to be any of the
+   provided types. Each type in the union is evaluated separately and can use
+   any of the syntaxes above.
+
+   **Examples:**
+   ```
+   type_check(c(), a = character|factor)
+   ```
+
+## Type Parameters
+
+Many type systems implement a form of generalization which uses type parameters
+to constrain valid arguments.
+
+For example, if we want to make a function that produces a `data.frame`, but
+want to avoid implicit recycling of column values, then we may want to insist
+that all arguments have the same length. This is a perfect use case for a type
+parameter. For the sake of example, we'll also insist that all columns are less
+than 5 rows long.
+
+```{r}
+with(list(x = 1:3, y = 2:4), { 
+  type_constrain(type_check(c("T", "N"), x = T(length=N), y = T(length=N)), N < 5)
+})
+```
+
+# Syntactic Sugar
+
+Although you are free to check types using the `type_check` and `type_constrain`
+functions yourself, the `type` and `where` functions are provided to process
+functions that use a type definition syntactic sugar.
+
+```{r}
+type(function(a = 1:3 :numeric, b = letters[1:3] :character) {
+  print(paste(a, b))
+})
+```
+
+The contents after the last `:` are used as the type signature, and embedded
+within the function to perform type checks.
+
+> **Note**
+>
+> If you'd like to provide a type for an argument that has no default value, you
+> must provide a placeholder `.` in order to use this type syntax.
+>
+> ```
+> function(a = . :character) {}
+> ```
+
+## Type Parameters
+
+Likewise, the `where` function can be used to set type parameters.
+
